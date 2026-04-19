@@ -38,20 +38,6 @@ jobs:
               run: |
                 echo "Semantic Version: v${{ steps.tagger.outputs.version }}"
 
-            - name: Run Action-GH-Release
-              uses: softprops/action-gh-release@v2
-              with:
-                tag_name: v${{ steps.tagger.outputs.version }}
-                name: Release v${{ steps.tagger.outputs.version }}
-                body: ${{ github.event.pull_request.body }}
-
-            # I think this code should be here, but it might be better to put it before getting the semantic version, 
-            # so that we can use the version number in the deployment process.
-            - name: Checkout code for deployment
-              uses: actions/checkout@v6
-              with:
-                  fetch-depth: 0
-
             - name: Setup .NET
               uses: actions/setup-dotnet@v5
               with:
@@ -65,4 +51,11 @@ jobs:
 
             - name: Publish the solution
               run: dotnet publish ${{ env.SOLUTION_NAME }} --configuration Release --no-restore --output ./publish # The output directory is wrong
+
+            - name: Run Action-GH-Release
+              uses: softprops/action-gh-release@v2
+              with:
+                tag_name: v${{ steps.tagger.outputs.version }}
+                name: Release v${{ steps.tagger.outputs.version }}
+                body: ${{ github.event.pull_request.body }}
 
