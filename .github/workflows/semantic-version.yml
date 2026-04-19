@@ -1,0 +1,68 @@
+# This workflow is based on the Semantic-Versions.yml workflow,
+# but it adds deploying to the server. Refer to Semantic-Versions.yml 
+# for comments about the workflow.
+
+name: Semantic Versioning Workflow with Deployment
+
+on:
+    pull_request:
+      types: closed
+      branches: 
+        - main
+      paths-ignore:
+        - '.github/**'
+    workflow_dispatch: # manual
+    
+jobs:
+    Find-Version-Numbers:
+        runs-on: self-hosted
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            SOLUTION_NAME: 'FPTimetrackCore/FPTimetrackCore.sln'
+        steps:
+            - name: Checkout files
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0 # Fetch all history for all branches and tags
+
+            - name: Determine semantic version
+              id: tagger
+              uses: paulhatch/semantic-version@v5.4.0
+              with:
+                  tag_prefix: 'v'
+                  major_pattern: 'MAJOR'
+                  minor_pattern: 'MINOR'
+                  version_format: '${major}.${minor}.${patch}'
+
+            - name: Print Semantic Version
+              run: |
+                echo "Semantic Version: v${{ steps.tagger.outputs.version }}"
+
+            - name: Run Action-GH-Release
+              uses: softprops/action-gh-release@v2
+              with:
+                tag_name: v${{ steps.tagger.outputs.version }}
+                name: Release v${{ steps.tagger.outputs.version }}
+                body: ${{ github.event.pull_request.body }}
+
+            # I think this code should be here, but it might be better to put it before getting the semantic version, 
+            # so that we can use the version number in the deployment process.
+            - name: Checkout code for deployment
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - name: Setup .NET
+              uses: actions/setup-dotnet@v5
+              with:
+                dotnet-version: '9.0.x'
+
+            - name: Restore dependencies
+              run: dotnet restore ${{ env.SOLUTION_NAME }}
+
+            - name: Build the solution
+              run: dotnet build ${{ env.SOLUTION_NAME }} --configuration Release --no-restore
+
+            - name: Publish the solution
+              run: dotnet publish ${{ env.SOLUTION_NAME }} --configuration Release --no-restore --output ./publish # The output directory is wrong
+
